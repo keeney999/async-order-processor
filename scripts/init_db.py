@@ -1,10 +1,14 @@
+"""Populate the database with test data."""
+
 import asyncio
 import logging
+import subprocess
 from decimal import Decimal
 
+from sqlalchemy import text
 from sqlmodel import select
 
-from app.core.database import async_session
+from app.core.database import async_session, engine
 from app.core.logger import setup_logging
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.product import Product
@@ -14,15 +18,32 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+async def ensure_migrations():
+    """Run Alembic migrations if tables don't exist."""
+    async with engine.connect() as conn:
+        # Check if 'user' table exists
+        result = await conn.execute(
+            text(
+                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user')"
+            )
+        )
+        exists = result.scalar()
+        if not exists:
+            logger.info("Tables not found, running migrations...")
+            # Run alembic upgrade head
+            subprocess.run(["alembic", "upgrade", "head"], check=True)
+
+
 async def create_test_data():
+    """Insert test users, products, and orders."""
     async with async_session() as db:
-        # Проверяем, есть ли уже данные
+        # Check if already populated
         result = await db.execute(select(User).limit(1))
         if result.scalar_one_or_none():
             logger.info("Test data already exists, skipping")
             return
 
-        # Создаём пользователей
+        # Users
         users = [
             User(email="alice@example.com", full_name="Alice", hashed_password="fake"),
             User(email="bob@example.com", full_name="Bob", hashed_password="fake"),
@@ -31,7 +52,7 @@ async def create_test_data():
             db.add(u)
         await db.flush()
 
-        # Создаём товары
+        # Products
         products = [
             Product(
                 name="Laptop",
@@ -68,7 +89,7 @@ async def create_test_data():
             db.add(p)
         await db.flush()
 
-        # Создаём несколько заказов для демонстрации статистики
+        # Orders
         orders = [
             Order(
                 user_id=users[0].id,
@@ -85,6 +106,7 @@ async def create_test_data():
             db.add(o)
         await db.flush()
 
+        # Order items
         order_items = [
             OrderItem(
                 order_id=orders[0].id,
@@ -113,16 +135,17 @@ async def create_test_data():
         ]
         for oi in order_items:
             db.add(oi)
-        await db.commit()
 
+        await db.commit()
         logger.info(
             f"Created {len(users)} users, {len(products)} products, {len(orders)} orders"
         )
 
 
 async def main():
+    """Run the data population."""
+    await ensure_migrations()
     await create_test_data()
-    logger.info("Database initialization complete.")
 
 
 if __name__ == "__main__":
