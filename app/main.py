@@ -3,8 +3,11 @@
 from fastapi import FastAPI
 
 from app.core.config import settings
+from app.core.logger import setup_logging
 
-app = FastAPI(title="Async Order Processor", version="0.1.0")
+setup_logging()
+
+app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 
 
 @app.get("/health")
