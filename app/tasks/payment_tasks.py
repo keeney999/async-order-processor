@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @celery_app.task(bind=True, max_retries=3)
 def process_payment_task(self, order_id: int) -> dict:
     """
-    Celery task to process payment for an order.
+    Process payment for an order.
 
     Args:
         order_id: ID of the order.
@@ -42,7 +42,6 @@ def process_payment_task(self, order_id: int) -> dict:
             if success:
                 return {"status": "paid", "order_id": order_id}
             else:
-                # Optionally, mark order as failed after payment failure
                 order.status = OrderStatus.FAILED
                 await db.commit()
                 return {"error": "Payment failed", "order_id": order_id}
