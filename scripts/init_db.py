@@ -1,14 +1,14 @@
-"""Populate the database with test data."""
-
 import asyncio
 import logging
-import subprocess
+import sys
 from decimal import Decimal
 
 from sqlalchemy import text
-from sqlmodel import select
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel import SQLModel, select
 
-from app.core.database import async_session, engine
+from app.core.config import settings
+from app.core.database import async_session
 from app.core.logger import setup_logging
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.product import Product
@@ -18,10 +18,20 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-async def ensure_migrations():
-    """Run Alembic migrations if tables don't exist."""
-    async with engine.connect() as conn:
-        # Check if 'user' table exists
+async def recreate_tables():
+    """Drop all tables and recreate them."""
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.drop_all)
+        await conn.run_sync(SQLModel.metadata.create_all)
+        logger.info("Tables recreated.")
+    await engine.dispose()
+
+
+async def create_tables_if_not_exist():
+    """Create tables if they don't exist."""
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
         result = await conn.execute(
             text(
                 "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user')"
@@ -29,21 +39,18 @@ async def ensure_migrations():
         )
         exists = result.scalar()
         if not exists:
-            logger.info("Tables not found, running migrations...")
-            # Run alembic upgrade head
-            subprocess.run(["alembic", "upgrade", "head"], check=True)
+            await conn.run_sync(SQLModel.metadata.create_all)
+            logger.info("Tables created.")
+    await engine.dispose()
 
 
 async def create_test_data():
-    """Insert test users, products, and orders."""
     async with async_session() as db:
-        # Check if already populated
         result = await db.execute(select(User).limit(1))
         if result.scalar_one_or_none():
             logger.info("Test data already exists, skipping")
             return
 
-        # Users
         users = [
             User(email="alice@example.com", full_name="Alice", hashed_password="fake"),
             User(email="bob@example.com", full_name="Bob", hashed_password="fake"),
@@ -52,7 +59,6 @@ async def create_test_data():
             db.add(u)
         await db.flush()
 
-        # Products
         products = [
             Product(
                 name="Laptop",
@@ -89,7 +95,6 @@ async def create_test_data():
             db.add(p)
         await db.flush()
 
-        # Orders
         orders = [
             Order(
                 user_id=users[0].id,
@@ -106,7 +111,6 @@ async def create_test_data():
             db.add(o)
         await db.flush()
 
-        # Order items
         order_items = [
             OrderItem(
                 order_id=orders[0].id,
@@ -143,8 +147,10 @@ async def create_test_data():
 
 
 async def main():
-    """Run the data population."""
-    await ensure_migrations()
+    if "--force" in sys.argv:
+        await recreate_tables()
+    else:
+        await create_tables_if_not_exist()
     await create_test_data()
 
 

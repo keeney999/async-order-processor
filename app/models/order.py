@@ -5,6 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import List, Optional
 
+from sqlalchemy import func
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -23,14 +24,15 @@ class Order(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
-    status: OrderStatus = Field(default=OrderStatus.PENDING)
+    status: OrderStatus = Field(default=OrderStatus.PENDING, index=True)
     total_amount: Optional[Decimal] = Field(
         default=None, max_digits=10, decimal_places=2
     )
-    created_at: datetime = Field(default_factory=datetime.now())
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()}
+    )
     updated_at: datetime = Field(
-        default_factory=datetime.now(),
-        sa_column_kwargs={"onupdate": datetime.now()},
+        default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": func.now()}
     )
 
     items: List["OrderItem"] = Relationship(back_populates="order")
@@ -44,6 +46,8 @@ class OrderItem(SQLModel, table=True):
     product_id: int = Field(foreign_key="product.id")
     quantity: int = Field(ge=1)
     price: Decimal = Field(max_digits=10, decimal_places=2)
-    created_at: datetime = Field(default_factory=datetime.now())
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow, sa_column_kwargs={"server_default": func.now()}
+    )
 
     order: Order = Relationship(back_populates="items")
