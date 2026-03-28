@@ -38,7 +38,7 @@ def override_settings(postgres_container, rabbitmq_container, redis_container):
     settings.DATABASE_URL = postgres_container.get_connection_url().replace(
         "postgresql://", "postgresql+asyncpg://"
     )
-    settings.RABBITMQ_URL = rabbitmq_container.get_amqp_url()
+    settings.RABBITMQ_URL = rabbitmq_container.get_connection_url()
     settings.REDIS_URL = redis_container.get_connection_url()
     yield
 
