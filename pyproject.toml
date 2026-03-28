@@ -19,7 +19,8 @@ dependencies = [
     "python-dotenv (>=1.2.2,<2.0.0)",
     "httpx (>=0.28.1,<0.29.0)",
     "python-multipart (>=0.0.22,<0.0.23)",
-    "alembic (>=1.18.4,<2.0.0)"
+    "alembic (>=1.18.4,<2.0.0)",
+    "aio-pika (>=9.6.2,<10.0.0)"
 ]
 
 
